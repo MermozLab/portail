@@ -37,14 +37,17 @@
   </div>
 
 <script>
-  // --- Adresses des deux sites ---
-  const PRIMARY = "https://mermozlab.codeberg.page/sciences/";              // site principal (Codeberg)
-  const MIRROR  = "https://ppruvost.github.io/tableau_sciences/";          // site miroir (GitHub Pages)
-  const TIMEOUT_MS = 3000;                                                // délai avant de basculer sur le miroir
+  // --- Adresses des sites, par ordre de priorité ---
+  const SITES = [
+    "https://mermozlab.codeberg.page/sciences/",       // 1. site principal (Codeberg)
+    "https://mermozlab.github.io/tableau_sciences/",   // 2. miroir GitHub Pages (organisation MermozLab)
+    "https://ppruvost.github.io/tableau_sciences/"     // 3. miroir GitHub Pages (ppruvost)
+  ];
+  const TIMEOUT_MS = 3000; // délai avant de passer au site suivant
 
   function goTo(url) { window.location.replace(url); }
 
-  function checkPrimary() {
+  function check(url) {
     return new Promise((resolve, reject) => {
       const controller = new AbortController();
       const timer = setTimeout(() => {
@@ -52,18 +55,27 @@
         reject(new Error("timeout"));
       }, TIMEOUT_MS);
 
-      fetch(PRIMARY, { mode: "no-cors", cache: "no-store", signal: controller.signal })
+      fetch(url, { mode: "no-cors", cache: "no-store", signal: controller.signal })
         .then(() => { clearTimeout(timer); resolve(); })
         .catch((err) => { clearTimeout(timer); reject(err); });
     });
   }
 
-  checkPrimary()
-    .then(() => goTo(PRIMARY))
-    .catch(() => {
-      document.getElementById("msg").textContent = "Site principal indisponible, redirection vers le miroir…";
-      goTo(MIRROR);
-    });
+  async function start() {
+    // On teste les sites un par un, sauf le dernier (utilisé par défaut)
+    for (let i = 0; i < SITES.length - 1; i++) {
+      try {
+        await check(SITES[i]);
+        return goTo(SITES[i]);
+      } catch (e) {
+        document.getElementById("msg").textContent =
+          "Site indisponible, essai du site suivant…";
+      }
+    }
+    goTo(SITES[SITES.length - 1]);
+  }
+
+  start();
 </script>
 </body>
 </html>
